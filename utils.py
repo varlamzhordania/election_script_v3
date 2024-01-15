@@ -31,8 +31,7 @@ def connect_to_sql_server(server, database, username, password):
     try:
         connection = pyodbc.connect(connection_string)
         cursor = connection.cursor()
-        logger.info("Connected to SQL Server successfully!")
-        return cursor
+        return cursor, connection
 
     except pyodbc.Error as ex:
         logger.error(f"Error connecting to SQL Server: {ex}")

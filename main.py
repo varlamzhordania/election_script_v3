@@ -21,14 +21,33 @@ if __name__ == "__main__":
 
     table_to_truncate = 'ElectionGuide'
 
-    cursor = connect_to_sql_server(username=db_username, password=db_password, server=db_host, database=db_database)
-    if cursor is None:
-        sys.exit(1)
+    if db_username and db_password and db_host and db_database:
+        cursor, connection = connect_to_sql_server(
+            username=db_username,
+            password=db_password,
+            server=db_host,
+            database=db_database
+        )
+        if cursor is not None:
+            logger.info("Connected to SQL Server successfully!")
+    else:
+        missing_credentials = []
+
+        if not db_username:
+            missing_credentials.append("username")
+        if not db_password:
+            missing_credentials.append("password")
+        if not db_host:
+            missing_credentials.append("host")
+        if not db_database:
+            missing_credentials.append("database")
+
+        print(f"Please make sure the following database credentials are provided: {', '.join(missing_credentials)}")
+        sys.exit(1)  # Exit with a non-zero status code to indicate an error
 
     try:
         logger.info("Election Guide API Script Running")
         logger.info(f"Script Run Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
         api_data = get_api_data(api_endpoint, api_token)
 
         if api_data:
