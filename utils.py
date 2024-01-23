@@ -1,7 +1,7 @@
 import requests
 import pyodbc
 from logger import main_logger as logger
-
+import mysql.connector
 import configparser
 from datetime import datetime, timedelta
 
@@ -35,6 +35,22 @@ def connect_to_sql_server(server, database, username, password):
 
     except pyodbc.Error as ex:
         logger.error(f"Error connecting to SQL Server: {ex}")
+        return None
+
+
+def connect_to_mysql_server(host, database, user, password):
+    try:
+        connection = mysql.connector.connect(
+            host=host,
+            database=database,
+            user=user,
+            password=password
+        )
+        cursor = connection.cursor()
+        return cursor, connection
+
+    except mysql.connector.Error as ex:
+        logger.error(f"Error connecting to MySQL Server: {ex}")
         return None
 
 
@@ -108,7 +124,7 @@ def get_api_data(api_url, token):
         return None
 
 
-def insert_eguide_election_data(cursor, data):
+def insert_eguide_election_data(cursor, data, cursor_type="mssql"):
     election_id = data['election_id']
 
     voting_methods_type = None
@@ -174,130 +190,213 @@ def insert_eguide_election_data(cursor, data):
         'voting_methods_instructions': voting_methods_instructions,
     }
 
-    # Calculate election_range_end_date
-    if election_data['election_range_start_date']:
-        start_date = datetime.strptime(election_data['election_range_start_date'], '%Y-%m-%d')
-        six_months = start_date - timedelta(days=180)
-        election_data['election_range_start_date'] = six_months.strftime('%Y-%m-%d')
-
     # Inserting data into the ElectionGuide table
-    cursor.execute(
-        '''
-        INSERT INTO dbo.ElectionGuide (
-            ExternalID,
-            Encode,
-            Title,
-            PubDate,
-            ElectIssues,
-            Snap,
-            OrigElectYear,
-            StartTime,
-            EndTime,
-            CovidDelay,
-            CovidEffects,
-            ElectStartDate,
-            ElectEndDate,
-            ElectBlackoutStartDate,
-            ElectBlackoutEndDate,
-            Category,
-            SubCategory,
-            ElecSys,
-            ElectCommName,
-            Url,
-            Source,
-            DistrictID,
-            Country,
-            CountryCode,
-            DistrictType,
-            GovFun,
-            GovFunUpdate,
-            RegDeadline,
-            VotingAge,
-            EligibleVoters,
-            FirstTimeVoters,
-            VotingType,
-            VotingPrimary,
-            VotingStartDate,
-            VotingEndDate,
-            Excurse,
-            Description
+    if cursor_type == "mssql":
+        cursor.execute(
+            '''
+            INSERT INTO dbo.ElectionGuide (
+                ExternalID,
+                NameEncode,
+                ElectName,
+                PubDate,
+                ElectIssues,
+                Snap,
+                OrigElectYear,
+                StartTime,
+                EndTime,
+                CovidDelay,
+                CovidEffects,
+                ElectStartDate,
+                ElectEndDate,
+                ElectBlackoutStartDate,
+                ElectBlackoutEndDate,
+                Category,
+                SubCategory,
+                ElecSys,
+                ElectCommName,
+                Url,
+                Source,
+                DistrictID,
+                Title,
+                CountryCode,
+                DistrictType,
+                GovFun,
+                GovFunUpdate,
+                RegDeadline,
+                VotingAge,
+                EligibleVoters,
+                FirstTimeVoters,
+                VotingType,
+                VotingPrimary,
+                VotingStartDate,
+                VotingEndDate,
+                Excurse,
+                Description
+            )
+            VALUES (
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                TRY_CONVERT(datetimeoffset, ?, 127),
+                TRY_CONVERT(datetimeoffset, ?, 127),
+                ?,
+                ?,
+                TRY_CONVERT(datetimeoffset, ?, 127),
+                TRY_CONVERT(datetimeoffset, ?, 127),
+                TRY_CONVERT(datetimeoffset, ?, 127),
+                TRY_CONVERT(datetimeoffset, ?, 127),
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                TRY_CONVERT(datetimeoffset, ?, 127),
+                TRY_CONVERT(datetimeoffset, ?, 127),
+                ?,
+                ?
+            )
+            ''', (
+                election_data['election_id'],
+                election_data['election_name_encode'],
+                election_data['election_name'],
+                election_data['election_date_updated'],
+                election_data['election_issues'],
+                election_data['is_snap_election'],
+                election_data['original_election_year'],
+                election_data['election_range_start_date'],
+                election_data['election_range_end_date'],
+                election_data['is_delayed_covid19'],
+                election_data['covid_effects'],
+                election_data['election_declared_start_date'],
+                election_data['election_declared_end_date'],
+                election_data['election_blackout_start_date'],
+                election_data['election_blackout_end_date'],
+                election_data['election_type'],
+                election_data['election_scope'],
+                election_data['electoral_system'],
+                election_data['election_commission_name'],
+                election_data['administring_election_commission_website'],
+                election_data['election_source'],
+                election_data['district_ocd_id'],
+                election_data['district_name'],
+                election_data['district_country'],
+                election_data['district_type'],
+                election_data['government_functions'],
+                election_data['government_functions_updated_date'],
+                election_data['voter_registration_day_deadline'],
+                election_data['voting_age_minimum_inclusive'],
+                election_data['eligible_voters'],
+                election_data['first_time_voters'],
+                election_data['voting_methods_type'],
+                election_data['voting_methods_primary'],
+                election_data['voting_methods_start_date'],
+                election_data['voting_methods_end_date'],
+                election_data['voting_methods_execuse_required'],
+                election_data['voting_methods_instructions']
+            )
         )
-        VALUES (
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            TRY_CONVERT(datetimeoffset, ?, 127),
-            TRY_CONVERT(datetimeoffset, ?, 127),
-            ?,
-            ?,
-            TRY_CONVERT(datetimeoffset, ?, 127),
-            TRY_CONVERT(datetimeoffset, ?, 127),
-            TRY_CONVERT(datetimeoffset, ?, 127),
-            TRY_CONVERT(datetimeoffset, ?, 127),
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            TRY_CONVERT(datetimeoffset, ?, 127),
-            TRY_CONVERT(datetimeoffset, ?, 127),
-            ?,
-            ?
+    elif cursor_type == "mysql":
+        cursor.execute(
+            '''
+            INSERT INTO ElectionGuide (
+                ExternalID,
+                NameEncode,
+                ElectName,
+                PubDate,
+                ElectIssues,
+                Snap,
+                OrigElectYear,
+                StartTime,
+                EndTime,
+                CovidDelay,
+                CovidEffects,
+                ElectStartDate,
+                ElectEndDate,
+                ElectBlackoutStartDate,
+                ElectBlackoutEndDate,
+                Category,
+                SubCategory,
+                ElecSys,
+                ElectCommName,
+                Url,
+                Source,
+                DistrictID,
+                Title,
+                CountryCode,
+                DistrictType,
+                GovFun,
+                GovFunUpdate,
+                RegDeadline,
+                VotingAge,
+                EligibleVoters,
+                FirstTimeVoters,
+                VotingType,
+                VotingPrimary,
+                VotingStartDate,
+                VotingEndDate,
+                Excurse,
+                Description
+            )
+            VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            )
+            ''', (
+                election_data['election_id'],
+                election_data['election_name_encode'],
+                election_data['election_name'],
+                election_data['election_date_updated'],
+                election_data['election_issues'],
+                election_data['is_snap_election'],
+                election_data['original_election_year'],
+                election_data['election_range_start_date'],
+                election_data['election_range_end_date'],
+                election_data['is_delayed_covid19'],
+                election_data['covid_effects'],
+                election_data['election_declared_start_date'],
+                election_data['election_declared_end_date'],
+                election_data['election_blackout_start_date'],
+                election_data['election_blackout_end_date'],
+                election_data['election_type'],
+                election_data['election_scope'],
+                election_data['electoral_system'],
+                election_data['election_commission_name'],
+                election_data['administring_election_commission_website'],
+                election_data['election_source'],
+                election_data['district_ocd_id'],
+                election_data['district_name'],
+                election_data['district_country'],
+                election_data['district_type'],
+                election_data['government_functions'],
+                election_data['government_functions_updated_date'],
+                election_data['voter_registration_day_deadline'],
+                election_data['voting_age_minimum_inclusive'],
+                election_data['eligible_voters'],
+                election_data['first_time_voters'],
+                election_data['voting_methods_type'],
+                election_data['voting_methods_primary'],
+                election_data['voting_methods_start_date'],
+                election_data['voting_methods_end_date'],
+                election_data['voting_methods_execuse_required'],
+                election_data['voting_methods_instructions']
+            )
         )
-        ''', (
-            election_data['election_id'],
-            election_data['election_name_encode'],
-            election_data['election_name'],
-            election_data['election_date_updated'],
-            election_data['election_issues'],
-            election_data['is_snap_election'],
-            election_data['original_election_year'],
-            election_data['election_range_start_date'],
-            election_data['election_range_end_date'],
-            election_data['is_delayed_covid19'],
-            election_data['covid_effects'],
-            election_data['election_declared_start_date'],
-            election_data['election_declared_end_date'],
-            election_data['election_blackout_start_date'],
-            election_data['election_blackout_end_date'],
-            election_data['election_type'],
-            election_data['election_scope'],
-            election_data['electoral_system'],
-            election_data['election_commission_name'],
-            election_data['administring_election_commission_website'],
-            election_data['election_source'],
-            election_data['district_ocd_id'],
-            election_data['district_name'],
-            election_data['district_country'],
-            election_data['district_type'],
-            election_data['government_functions'],
-            election_data['government_functions_updated_date'],
-            election_data['voter_registration_day_deadline'],
-            election_data['voting_age_minimum_inclusive'],
-            election_data['eligible_voters'],
-            election_data['first_time_voters'],
-            election_data['voting_methods_type'],
-            election_data['voting_methods_primary'],
-            election_data['voting_methods_start_date'],
-            election_data['voting_methods_end_date'],
-            election_data['voting_methods_execuse_required'],
-            election_data['voting_methods_instructions']
-        )
-    )
+    else:
+        logger.error("Unsupported database type, ", cursor_type)
+        return None
