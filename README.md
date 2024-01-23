@@ -22,6 +22,7 @@ This Python script integrates with the Election Guide API to fetch election data
     DB_PASSWORD = your_database_password
     DB_HOST = your_database_host
     DB_DATABASE = your_database_name
+    DB_TYPE = mysql / mssql
    
     [General]
     LOG_PATH = ./election_guide.log
