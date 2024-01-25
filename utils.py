@@ -33,8 +33,8 @@ def connect_to_sql_server(server, database, username, password):
         cursor = connection.cursor()
         return cursor, connection
 
-    except pyodbc.Error as ex:
-        logger.error(f"Error connecting to SQL Server: {ex}")
+    except:
+        logger.error(f"Error connecting to SQL Server:")
         return None
 
 
@@ -46,15 +46,17 @@ def connect_to_mysql_server(host, database, user, password):
             user=user,
             password=password
         )
-        cursor = connection.cursor()
-        return cursor, connection
-
+        if connection.is_connected():
+            cursor = connection.cursor()
+            return cursor, connection
+        else:
+            return None, None
     except mysql.connector.Error as ex:
         logger.error(f"Error connecting to MySQL Server: {ex}")
-        return None
+        return None, None
 
 
-def truncate_table(cursor, table_name):
+def truncate_table(cursor, table_name, db_type):
     """
     Truncate a table in the database.
 
@@ -75,7 +77,8 @@ def truncate_table(cursor, table_name):
         cursor.execute(sql_query)
 
         # Commit the transaction
-        cursor.commit()
+        if db_type == "mssql":
+            cursor.commit()
 
         # Get the row count after truncating
         cursor.execute(f'SELECT COUNT(*) FROM {table_name}')
@@ -84,10 +87,142 @@ def truncate_table(cursor, table_name):
         rows_removed = row_count_before - row_count_after
         logger.info(f"Purged (Removed) {rows_removed} Rows from Election Guide DB Table")
 
-    except pyodbc.Error as ex:
+    except Exception as ex:
         # Handle SQL errors
         logger.error(f"Error truncating table {table_name}: {ex}")
-        cursor.rollback()
+
+
+def create_table_if_not_exists_mysql(cursor):
+    # Define the table creation script for MySQL
+    table_creation_script_mysql = """
+    CREATE TABLE IF NOT EXISTS ElectionGuide (
+        ID INT AUTO_INCREMENT PRIMARY KEY,
+        ExternalID VARCHAR(1024),
+        Type VARCHAR(128),
+        NameEncode VARCHAR(1024),
+        Geometry GEOMETRY,
+        Location TEXT,
+        StartTime DATETIME,
+        EndTime DATETIME,
+        Description TEXT,
+        Url VARCHAR(2048),
+        ImageUrl VARCHAR(2048),
+        CreatedTime DATETIME,
+        UpdatedTime DATETIME,
+        Source TEXT,
+        ElectionNameEncode TEXT,
+        Encode TEXT,
+        ElectIssues TEXT,
+        Snap TEXT,
+        OrigElectYear TEXT,
+        CovidDelay TEXT,
+        CovidEffects TEXT,
+        ElectStartDate DATETIME,
+        ElectEndDate DATETIME,
+        ElectBlackoutStartDate DATETIME,
+        ElectBlackoutEndDate DATETIME,
+        Category TEXT,
+        SubCategory TEXT,
+        ElecSys TEXT,
+        ElectCommName TEXT,
+        DistrictID TEXT,
+        Title TEXT,
+        CountryCode TEXT,
+        DistrictType TEXT,
+        PubDate TEXT,
+        GovFun TEXT,
+        GovFunUpdate TEXT,
+        RegDeadline TEXT,
+        VotingAge TEXT,
+        EligibleVoters TEXT,
+        FirstTimeVoters TEXT,
+        VotingType TEXT,
+        VotingPrimary TEXT,
+        VotingStartDate DATETIME,
+        VotingEndDate DATETIME,
+        Excurse TEXT,
+        DaysOffset TEXT,
+        ElectName TEXT
+    );
+    """
+    try:
+        # Check if the table exists
+        cursor.execute("SHOW TABLES LIKE 'ElectionGuide'")
+        if cursor.fetchone():
+            logger.info("Table 'ElectionGuide' already exists.")
+        else:
+            # Create the table if it doesn't exist
+            cursor.execute(table_creation_script_mysql)
+            logger.info("Table 'ElectionGuide' created successfully.")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+
+
+def create_table_if_not_exists_sql_server(cursor):
+    # Define the table creation script for SQL Server
+    table_creation_script_sql_server = """
+    CREATE TABLE dbo.ElectionGuide (
+        ID INT IDENTITY(1,1) PRIMARY KEY,
+        ExternalID NVARCHAR(1024),
+        Type NVARCHAR(128),
+        NameEncode NVARCHAR(1024),
+        Geometry GEOMETRY,
+        Location NVARCHAR(MAX),
+        StartTime DATETIMEOFFSET(7),
+        EndTime DATETIMEOFFSET(7),
+        Description NVARCHAR(MAX),
+        Url NVARCHAR(2048),
+        ImageUrl NVARCHAR(2048),
+        CreatedTime DATETIMEOFFSET(7),
+        UpdatedTime DATETIMEOFFSET(7),
+        Source NVARCHAR(MAX),
+        ElectionNameEncode NVARCHAR(MAX),
+        Encode NVARCHAR(MAX),
+        ElectIssues NVARCHAR(MAX),
+        Snap NVARCHAR(MAX),
+        OrigElectYear NVARCHAR(MAX),
+        CovidDelay NVARCHAR(MAX),
+        CovidEffects NVARCHAR(MAX),
+        ElectStartDate DATETIMEOFFSET(7),
+        ElectEndDate DATETIMEOFFSET(7),
+        ElectBlackoutStartDate DATETIMEOFFSET(7),
+        ElectBlackoutEndDate DATETIMEOFFSET(7),
+        Category NVARCHAR(MAX),
+        SubCategory NVARCHAR(MAX),
+        ElecSys NVARCHAR(MAX),
+        ElectCommName NVARCHAR(MAX),
+        DistrictID NVARCHAR(MAX),
+        Title NVARCHAR(MAX),
+        CountryCode NVARCHAR(MAX),
+        DistrictType NVARCHAR(MAX),
+        PubDate NVARCHAR(MAX),
+        GovFun NVARCHAR(MAX),
+        GovFunUpdate NVARCHAR(MAX),
+        RegDeadline NVARCHAR(MAX),
+        VotingAge NVARCHAR(MAX),
+        EligibleVoters NVARCHAR(MAX),
+        FirstTimeVoters NVARCHAR(MAX),
+        VotingType NVARCHAR(MAX),
+        VotingPrimary NVARCHAR(MAX),
+        VotingStartDate DATETIMEOFFSET(7),
+        VotingEndDate DATETIMEOFFSET(7),
+        Excurse NVARCHAR(MAX),
+        DaysOffset NVARCHAR(MAX),
+        ElectName NVARCHAR(MAX)
+    );
+    """
+    try:
+        # Check if the table exists
+        cursor.execute("SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'ElectionGuide'")
+        if cursor.fetchone():
+            logger.info("Table 'ElectionGuide' already exists.")
+        else:
+            # Create the table if it doesn't exist
+            cursor.execute(table_creation_script_sql_server)
+            cursor.commit()
+            logger.info("Table 'ElectionGuide' created successfully.")
+    except Exception as e:
+        logger.error(f"Error: {e}")
 
 
 def get_api_data(api_url, token):
@@ -355,7 +490,43 @@ def insert_eguide_election_data(cursor, data, cursor_type="mssql"):
                 Description
             )
             VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s
             )
             ''', (
                 election_data['election_id'],

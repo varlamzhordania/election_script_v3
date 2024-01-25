@@ -5,7 +5,7 @@ import sys
 import configparser
 from datetime import datetime, timedelta
 from utils import truncate_table, insert_eguide_election_data, get_api_data, connect_to_sql_server, \
-    connect_to_mysql_server
+    connect_to_mysql_server, create_table_if_not_exists_mysql, create_table_if_not_exists_sql_server
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -33,6 +33,8 @@ if __name__ == "__main__":
             )
             if cursor is not None:
                 logger.info("Connected to SQL Server successfully!")
+            else:
+                sys.exit(1)
         elif db_type == 'mysql':
             cursor, connection = connect_to_mysql_server(
                 user=db_username,
@@ -42,6 +44,9 @@ if __name__ == "__main__":
             )
             if cursor is not None:
                 logger.info("Connected to MYSQL successfully!")
+            else:
+                logger.error(f"Connection to MYSQL failed")
+                sys.exit(1)
         else:
             logger.error("Invalid database type, only mssql and mysql")
             sys.exit(1)
@@ -63,6 +68,13 @@ if __name__ == "__main__":
     try:
         logger.info("Election Guide API Script Running")
         logger.info(f"Script Run Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        if db_type == "mssql":
+            create_table_if_not_exists_sql_server(cursor)
+        elif db_type == "mysql":
+            create_table_if_not_exists_mysql(cursor)
+        else:
+            logger.error("Invalid database type, only mssql and mysql")
+            sys.exit(1)
         api_data = get_api_data(api_endpoint, api_token)
 
         if api_data:
@@ -89,7 +101,7 @@ if __name__ == "__main__":
             ]
 
             logger.info(f"Found Total of {total_election_ids} unique Election IDs")
-            truncate_table(cursor, table_to_truncate)
+            truncate_table(cursor, table_to_truncate, db_type)
             logger.info("Processing Election Guide JSON payload data")
             logger.info(
                 f"Found {len(election_ids_starting_from_today)} Election IDs starting from today {today}"
@@ -98,7 +110,7 @@ if __name__ == "__main__":
                 f"Found {len(election_ids_before_today)} Election IDs with Election Dates before today {today}"
             )
             logger.info(f"Inserting Total of {len(election_ids_starting_from_today)} unique Election IDs")
-
+            raw_data = []
             for record in api_data:
                 if record.get("election_range_start_date"):
                     record_start_date = datetime.strptime(record.get("election_range_start_date"), '%Y-%m-%d')
@@ -108,8 +120,15 @@ if __name__ == "__main__":
                         logger.info(
                             f"Inserting Election ID {record['election_id']} – {record['election_name']['en_US']} – {record_start_date.strftime('%Y-%m-%d')}"
                         )
+                        raw_data.append(record)
 
-            cursor.commit()
+            import json
+
+            with open("raw_data.json", "w") as f:
+                f.write(json.dumps(raw_data,indent=4))
+
+            if db_type == "mssql":
+                cursor.commit()
             logger.info("Election Guide Data Successfully Inserted")
 
         else:
@@ -119,5 +138,6 @@ if __name__ == "__main__":
         logger.error(f"An error occurred {ex}")
     finally:
         cursor.close()
+        connection.close()
         logger.info(f"INFO Election Guide Data Successfully Inserted {total_inserted} Election Records")
         logger.info(f"Terminating Script – {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
