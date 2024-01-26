@@ -82,39 +82,41 @@ if __name__ == "__main__":
 
             total_election_ids = len(api_data)
             today = datetime.today()
-            election_ids_starting_from_today = [
+            previous_week = today - timedelta(days=7)
+            election_ids_starting_from_previous_week = [
                 record['election_id']
                 for record in api_data
                 if record.get("election_range_start_date") and datetime.strptime(
                     record.get("election_range_start_date"),
                     '%Y-%m-%d'
-                ) >= today
+                ) >= previous_week
             ]
 
-            election_ids_before_today = [
+            election_ids_before_previous_week = [
                 record['election_id']
                 for record in api_data
                 if record.get("election_range_start_date") and datetime.strptime(
                     record.get("election_range_start_date"),
                     '%Y-%m-%d'
-                ) < today
+                ) < previous_week
             ]
 
             logger.info(f"Found Total of {total_election_ids} unique Election IDs")
             truncate_table(cursor, table_to_truncate, db_type)
             logger.info("Processing Election Guide JSON payload data")
             logger.info(
-                f"Found {len(election_ids_starting_from_today)} Election IDs starting from today {today}"
+                f"Found {len(election_ids_starting_from_previous_week)} Election IDs starting from 1 week before today {today}"
             )
             logger.info(
-                f"Found {len(election_ids_before_today)} Election IDs with Election Dates before today {today}"
+                f"Found {len(election_ids_before_previous_week)} Election IDs with Election Dates before previous week {previous_week}"
             )
-            logger.info(f"Inserting Total of {len(election_ids_starting_from_today)} unique Election IDs")
+            logger.info(f"Inserting Total of {len(election_ids_starting_from_previous_week)} unique Election IDs")
             raw_data = []
             for record in api_data:
                 if record.get("election_range_start_date"):
                     record_start_date = datetime.strptime(record.get("election_range_start_date"), '%Y-%m-%d')
-                    if record_start_date >= today:
+
+                    if record_start_date >= previous_week:
                         insert_eguide_election_data(cursor, record, db_type)
                         total_inserted += 1
                         logger.info(
@@ -125,7 +127,7 @@ if __name__ == "__main__":
             import json
 
             with open("raw_data.json", "w") as f:
-                f.write(json.dumps(raw_data,indent=4))
+                f.write(json.dumps(raw_data, indent=4))
 
             if db_type == "mssql":
                 cursor.commit()

@@ -17,8 +17,8 @@ def configure_logger(logger_name, log_file_path):
     """
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.INFO)
-
-    log_handler = logging.FileHandler(log_file_path)
+    current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_handler = logging.FileHandler(f"{log_file_path}_{current_date}.log")
     # %(asctime)s
     log_formatter = logging.Formatter('%(levelname)s %(message)s')
     log_handler.setFormatter(log_formatter)

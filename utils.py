@@ -140,7 +140,7 @@ def create_table_if_not_exists_mysql(cursor):
         VotingPrimary TEXT,
         VotingStartDate DATETIME,
         VotingEndDate DATETIME,
-        Excurse TEXT,
+        Excuse TEXT,
         DaysOffset TEXT,
         ElectName TEXT
     );
@@ -206,7 +206,7 @@ def create_table_if_not_exists_sql_server(cursor):
         VotingPrimary NVARCHAR(MAX),
         VotingStartDate DATETIMEOFFSET(7),
         VotingEndDate DATETIMEOFFSET(7),
-        Excurse NVARCHAR(MAX),
+        Excuse NVARCHAR(MAX),
         DaysOffset NVARCHAR(MAX),
         ElectName NVARCHAR(MAX)
     );
@@ -325,6 +325,27 @@ def insert_eguide_election_data(cursor, data, cursor_type="mssql"):
         'voting_methods_instructions': voting_methods_instructions,
     }
 
+    if not election_data['election_declared_start_date']:
+        election_data['election_declared_start_date'] = election_data['election_range_start_date']
+
+    if not election_data['government_functions']:
+        election_data['government_functions'] = None
+
+    if not election_data['voting_methods_execuse_required']:
+        election_data['voting_methods_execuse_required'] = None
+
+    days_offset_sql = '''
+        SELECT DATEDIFF(day, ?, GETDATE()) AS DaysOffset
+    '''
+
+    # Execute the SQL query to get DaysOffset
+    cursor.execute(days_offset_sql, (election_data['election_range_start_date'],))
+    days_offset_result = cursor.fetchone()
+    if days_offset_result[0] < 0:
+        election_data['days_offset'] = 1
+    else:
+        election_data['days_offset'] = days_offset_result[0]
+
     # Inserting data into the ElectionGuide table
     if cursor_type == "mssql":
         cursor.execute(
@@ -365,8 +386,9 @@ def insert_eguide_election_data(cursor, data, cursor_type="mssql"):
                 VotingPrimary,
                 VotingStartDate,
                 VotingEndDate,
-                Excurse,
-                Description
+                Excuse,
+                Description,
+                DaysOffset
             )
             VALUES (
                 ?,
@@ -404,6 +426,7 @@ def insert_eguide_election_data(cursor, data, cursor_type="mssql"):
                 ?,
                 TRY_CONVERT(datetimeoffset, ?, 127),
                 TRY_CONVERT(datetimeoffset, ?, 127),
+                ?,
                 ?,
                 ?
             )
@@ -444,7 +467,8 @@ def insert_eguide_election_data(cursor, data, cursor_type="mssql"):
                 election_data['voting_methods_start_date'],
                 election_data['voting_methods_end_date'],
                 election_data['voting_methods_execuse_required'],
-                election_data['voting_methods_instructions']
+                election_data['voting_methods_instructions'],
+                election_data['days_offset']
             )
         )
     elif cursor_type == "mysql":
@@ -486,10 +510,12 @@ def insert_eguide_election_data(cursor, data, cursor_type="mssql"):
                 VotingPrimary,
                 VotingStartDate,
                 VotingEndDate,
-                Excurse,
-                Description
+                Excuse,
+                Description,
+                DaysOffset
             )
             VALUES (
+                %s,
                 %s,
                 %s,
                 %s,
@@ -565,7 +591,8 @@ def insert_eguide_election_data(cursor, data, cursor_type="mssql"):
                 election_data['voting_methods_start_date'],
                 election_data['voting_methods_end_date'],
                 election_data['voting_methods_execuse_required'],
-                election_data['voting_methods_instructions']
+                election_data['voting_methods_instructions'],
+                election_data['days_offset']
             )
         )
     else:
