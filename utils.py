@@ -324,9 +324,18 @@ def insert_eguide_election_data(cursor, data, cursor_type="mssql"):
         'voting_methods_execuse_required': voting_methods_execuse_required,
         'voting_methods_instructions': voting_methods_instructions,
     }
+    if election_data['election_declared_start_date'] is None:
+        if election_data['election_range_start_date']:
+            election_data['election_declared_start_date'] = election_data['election_range_start_date']
+        else:
+            election_data['election_range_start_date'] = election_data['voting_methods_start_date']
+            election_data['election_declared_start_date'] = election_data['voting_methods_start_date']
 
-    if not election_data['election_declared_start_date']:
-        election_data['election_declared_start_date'] = election_data['election_range_start_date']
+    elif election_data['election_range_start_date'] is None:
+        election_data['election_range_start_date'] = election_data['election_declared_start_date']
+
+    elif election_data['voting_methods_start_date'] is None:
+        election_data['voting_methods_start_date'] = election_data['election_declared_start_date']
 
     if not election_data['government_functions']:
         election_data['government_functions'] = None
@@ -334,17 +343,15 @@ def insert_eguide_election_data(cursor, data, cursor_type="mssql"):
     if not election_data['voting_methods_execuse_required']:
         election_data['voting_methods_execuse_required'] = None
 
-    days_offset_sql = '''
-        SELECT DATEDIFF(day, ?, GETDATE()) AS DaysOffset
-    '''
+    election_start_date_str = election_data.get("election_declared_start_date")
+    election_start_date = datetime.strptime(election_start_date_str, '%Y-%m-%d')
+    now = datetime.now()
+    days_offset = election_start_date - now + timedelta(days=1)
 
-    # Execute the SQL query to get DaysOffset
-    cursor.execute(days_offset_sql, (election_data['election_range_start_date'],))
-    days_offset_result = cursor.fetchone()
-    if days_offset_result[0] < 0:
+    if days_offset.days < 0:
         election_data['days_offset'] = 1
     else:
-        election_data['days_offset'] = days_offset_result[0]
+        election_data['days_offset'] = days_offset.days
 
     # Inserting data into the ElectionGuide table
     if cursor_type == "mssql":
@@ -471,6 +478,7 @@ def insert_eguide_election_data(cursor, data, cursor_type="mssql"):
                 election_data['days_offset']
             )
         )
+
     elif cursor_type == "mysql":
         cursor.execute(
             '''
