@@ -161,55 +161,56 @@ def create_table_if_not_exists_mysql(cursor):
 def create_table_if_not_exists_sql_server(cursor):
     # Define the table creation script for SQL Server
     table_creation_script_sql_server = """
-    CREATE TABLE dbo.ElectionGuide (
-        ID INT IDENTITY(1,1) PRIMARY KEY,
-        ExternalID NVARCHAR(1024),
-        Type NVARCHAR(128),
-        NameEncode NVARCHAR(1024),
-        Geometry GEOMETRY,
-        Location NVARCHAR(MAX),
-        StartTime DATETIMEOFFSET(7),
-        EndTime DATETIMEOFFSET(7),
-        Description NVARCHAR(MAX),
-        Url NVARCHAR(2048),
-        ImageUrl NVARCHAR(2048),
-        CreatedTime DATETIMEOFFSET(7),
-        UpdatedTime DATETIMEOFFSET(7),
-        Source NVARCHAR(MAX),
-        ElectionNameEncode NVARCHAR(MAX),
-        Encode NVARCHAR(MAX),
-        ElectIssues NVARCHAR(MAX),
-        Snap NVARCHAR(MAX),
-        OrigElectYear NVARCHAR(MAX),
-        CovidDelay NVARCHAR(MAX),
-        CovidEffects NVARCHAR(MAX),
-        ElectStartDate DATETIMEOFFSET(7),
-        ElectEndDate DATETIMEOFFSET(7),
-        ElectBlackoutStartDate DATETIMEOFFSET(7),
-        ElectBlackoutEndDate DATETIMEOFFSET(7),
-        Category NVARCHAR(MAX),
-        SubCategory NVARCHAR(MAX),
-        ElecSys NVARCHAR(MAX),
-        ElectCommName NVARCHAR(MAX),
-        DistrictID NVARCHAR(MAX),
-        Title NVARCHAR(MAX),
-        CountryCode NVARCHAR(MAX),
-        DistrictType NVARCHAR(MAX),
-        PubDate NVARCHAR(MAX),
-        GovFun NVARCHAR(MAX),
-        GovFunUpdate NVARCHAR(MAX),
-        RegDeadline NVARCHAR(MAX),
-        VotingAge NVARCHAR(MAX),
-        EligibleVoters NVARCHAR(MAX),
-        FirstTimeVoters NVARCHAR(MAX),
-        VotingType NVARCHAR(MAX),
-        VotingPrimary NVARCHAR(MAX),
-        VotingStartDate DATETIMEOFFSET(7),
-        VotingEndDate DATETIMEOFFSET(7),
-        Excuse NVARCHAR(MAX),
-        DaysOffset NVARCHAR(MAX),
-        ElectName NVARCHAR(MAX)
-    );
+        CREATE TABLE dbo.ElectionGuide (
+            ID INT IDENTITY(1,1) PRIMARY KEY,
+            ExternalID NVARCHAR(1024),
+            Type NVARCHAR(128),
+            Title NVARCHAR(MAX),
+            Geometry GEOMETRY,
+            Location NVARCHAR(MAX),
+            StartTime DATETIMEOFFSET(7),
+            EndTime DATETIMEOFFSET(7),
+            Description NVARCHAR(MAX),
+            PhoneNumber NVARCHAR(MAX),
+            EmailAddress NVARCHAR (MAX),
+            Url NVARCHAR(2048),
+            ImageUrl NVARCHAR(2048),
+            CreatedTime DATETIMEOFFSET(7),
+            UpdatedTime DATETIMEOFFSET(7),
+            Source NVARCHAR(MAX),
+            ElectionNameEncode NVARCHAR(MAX),
+            NameEncode NVARCHAR(1024),
+            ElectIssues NVARCHAR(MAX),
+            Snap NVARCHAR(MAX),
+            OrigElectYear NVARCHAR(MAX),
+            CovidDelay NVARCHAR(MAX),
+            CovidEffects NVARCHAR(MAX),
+            ElectStartDate DATETIMEOFFSET(7),
+            ElectEndDate DATETIMEOFFSET(7),
+            ElectBlackoutStartDate DATETIMEOFFSET(7),
+            ElectBlackoutEndDate DATETIMEOFFSET(7),
+            Category NVARCHAR(MAX),
+            SubCategory NVARCHAR(MAX),
+            ElecSys NVARCHAR(MAX),
+            ElectCommName NVARCHAR(MAX),
+            DistrictID NVARCHAR(MAX),
+            CountryCode NVARCHAR(MAX),
+            DistrictType NVARCHAR(MAX),
+            PubDate NVARCHAR(MAX),
+            GovFun NVARCHAR(MAX),
+            GovFunUpdate NVARCHAR(MAX),
+            RegDeadline NVARCHAR(MAX),
+            VotingAge NVARCHAR(MAX),
+            EligibleVoters NVARCHAR(MAX),
+            FirstTimeVoters NVARCHAR(MAX),
+            VotingType NVARCHAR(MAX),
+            VotingPrimary NVARCHAR(MAX),
+            VotingStartDate DATETIMEOFFSET(7),
+            VotingEndDate DATETIMEOFFSET(7),
+            DaysOffset NVARCHAR(MAX),
+            ElectName NVARCHAR(MAX),
+            Excuse NVARCHAR(MAX)
+        );
     """
     try:
         # Check if the table exists
@@ -272,15 +273,15 @@ def insert_eguide_election_data(cursor, data, cursor_type="mssql"):
     # Check if data['voting_methods'] is not None
     if data.get('voting_methods') is not None:
         # Update values if voting_methods is present in data
-        voting_methods_type = '!!'.join(str(method.get('type', '')) for method in data['voting_methods'])
-        voting_methods_primary = '!!'.join(str(method.get('primary', '')) for method in data['voting_methods'])
-        voting_methods_start_date = '!!'.join(str(method.get('start', '')) for method in data['voting_methods'])
-        voting_methods_end_date = '!!'.join(str(method.get('end', '')) for method in data['voting_methods'])
-        voting_methods_execuse_required = '!!'.join(
+        voting_methods_type = ' | '.join(str(method.get('type', '')) for method in data['voting_methods'])
+        voting_methods_primary = ' | '.join(str(method.get('primary', '')) for method in data['voting_methods'])
+        voting_methods_start_date = ' | '.join(str(method.get('start', '')) for method in data['voting_methods'])
+        voting_methods_end_date = ' | '.join(str(method.get('end', '')) for method in data['voting_methods'])
+        voting_methods_execuse_required = ' | '.join(
             str(method.get('excuse-required', '')) if method.get('excuse-required') is not None else '' for method in
             data['voting_methods']
         )
-        voting_methods_instructions = '!!'.join(
+        voting_methods_instructions = ' | '.join(
             str(method.get('instructions', '')) for method in data['voting_methods']
         )
 
@@ -330,10 +331,8 @@ def insert_eguide_election_data(cursor, data, cursor_type="mssql"):
         else:
             election_data['election_range_start_date'] = election_data['voting_methods_start_date']
             election_data['election_declared_start_date'] = election_data['voting_methods_start_date']
-
     elif election_data['election_range_start_date'] is None:
         election_data['election_range_start_date'] = election_data['election_declared_start_date']
-
     elif election_data['voting_methods_start_date'] is None:
         election_data['voting_methods_start_date'] = election_data['election_declared_start_date']
 
